@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Dark Map</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.48.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.48.0/mapbox-gl.css' rel='stylesheet' />
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+    <script src='http://cdn.leafletjs.com/leaflet-0.7.1/leaflet.js'></script>
+    <link src ='http://cdn.leafletjs.com/leaflet-0.7.1/leaflet.css' rel="stylesheet"/>
+
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%;}
+        #checkboxes { position: absolute; top: 10px; left: 10px; font-family: 'arial', 'sans-serif';
+        font-size: 20px; background-color: white;  border: 1px solid black;padding: 5px 5px 5px 5px; }
+
+        .weather_marker{ background-size: cover; width: 50px; height: 50px; border-radius: 50%; cursor: pointer;}
+        .air_marker{ background-size: cover; width: 15px; height: 15px; border-radius: 50%; cursor: pointer;opacity :0.8;}
+        .pop_marker{ background-color : black; background-size: cover; border-radius: 50%; cursor: pointer; opacity :0.5;}
+
+       .mapboxgl-popup { max-width: 200px;}
+       .mapboxgl-popup-content {text-align: center; color: #FFFFFF; opacity :0.8; background-color: #000000;  border-color: #FFF000;;
+    font-family: 'Oswald }
+
+
+
+    </style>
+</head>
+<body>
+
+<div id='map'></div>
+<nav id= 'checkboxes'>
+    <input type="checkbox" name="기상정보" id="weatherCheck" >Weather
+    <Br>
+    <input type="checkbox" name="미세먼지" id="airCheck">Air Quality
+    <br>
+    <input type="checkbox" name="인구수" id="popCheck">Population
+    <br>
+    </nav>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiYWljdCIsImEiOiJjamxmeHZnMnAwaWlrM3ZwMTFwZzNzcDZrIn0.VlZtCnZpAgFtjgy8g1zRyA';
+
+const kyonggi = [
+
+    [127.424667,37.800297],[126.831947,37.658188],[126.988166,37.428904],
+     [126.863129,37.481052],[127.255189,37.429084],[127.139397,37.598598],
+     [126.934906,37.361523],[126.715789,37.615461],[127.240062,37.669766],
+    [127.060518,37.903086],[126.766014,37.501442],[127.126209,37.420156],
+    [127.008888,37.291111],[126.803226,37.379889],[126.821938,37.323608],
+    [127.270279,37.01083],[126.957061,37.393853],[127.046318,37.785263],
+    [127.490562,37.489719],[127.633888,37.29583],[127.075768,38.09404],
+    [127.070557,37.152222],[127.219062,37.226479],[126.989346,37.358403],
+    [127.047401,37.741501],[127.442497,37.279171],[126.780174,37.759869],
+    [126.992010,37.033667],[127.200730,37.894827],[127.198756,37.525735],
+    [126.816902,37.206821],[],[],[],[],[],[],[],[],[126.816902,37.206821]
+];
+
+
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/navigation-preview-night-v2',
+    center: [127.4614,37.4],
+    zoom: 8
+    //네비게이션 map style 'mapbox://styles/mapbox/navigation-preview-night-v2'
+    //커스텀 style 'mapbox://styles/aict/cjlhcc8dw024m2squ7vhz3ptd',
+    //dark style 'mapbox://styles/mapbox/dark-v9'
+
+});
+
+map.addControl(new mapboxgl.FullscreenControl());
+
+
+var hoveredStateId =  null;
+var popup = new mapboxgl.Popup({ offset: 1 }); //전역으로 팝업생성
+
+var weatherJSON = [];
+var airJSON = [];
+var popJSON = [];
+
+map.on('load', function () {
+
+   map.addSource("states", {
+        "type": "geojson",
+        "data": 'https://gist.githubusercontent.com/SEfriends/800d237d10d1f511dc6fe7608b8d2e6b/raw/67ba726ee6f3a87bbee60888749ae642f89ccf3e/map.geojson'
+    });
+
+        //경기도 데이터 'https://gist.githubusercontent.com/SEfriends/fb3d53f79b014e69746b5367650ab5be/raw/595ffdb750c45d4489dd5ccd25b03f92c4f44c30/map.geojson'
+        //전국 동까지 나눈거 데이터 https://raw.githubusercontent.com/vuski/admdongkor/master/ver20180724/HangJeongDong_ver20180724.geojson
+        //QGIS로 시로 나눈거 C:/Users/wearable/Desktop/kyonggiSi.geojson
+        //경기도 시로 나눈거 https://gist.githubusercontent.com/SEfriends/545b3c0b33f96e5a4b314befc9e404b5/raw/5a32edb6b5500a76162fbbe60ff25a60bafa0fb6/map.geojson
+        //경기도 행정구역 id추가한거 https://gist.githubusercontent.com/SEfriends/33894761f0c93ceed6c98e741a35d278/raw/1640631adb0f214dbdd93ffcc4efb9ef3f68c3c5/map.geojson
+        //weather id추가한거 https://gist.githubusercontent.com/SEfriends/a5ac18ec5ef84b75a10a5ffb9415e215/raw/0167599801762c6adf4d93c3fbfdaddd912d7a76/map.geojson
+        //weather id property로 추가 https://gist.githubusercontent.com/SEfriends/800d237d10d1f511dc6fe7608b8d2e6b/raw/67ba726ee6f3a87bbee60888749ae642f89ccf3e/map.geojson
+
+    // The feature-state dependent fill-opacity expression will render the hover effect
+    // when a feature's hover state is set to true.
+    map.addLayer({
+        "id": "state-fills",
+        "type": "fill",
+        "source": "states",
+        "layout": {},
+        "paint": {
+            "fill-color": "#D1D0CB",
+            "fill-opacity": ["case",
+                ["boolean", ["feature-state", "hover"], false],
+                1,
+                0.5
+            ]
+        }
+    });
+
+    map.addLayer({
+        "id": "state-borders",
+        "type": "line",
+        "source": "states",
+        "layout": {},
+        "paint": {
+            "line-color": "#D1D0CB",
+            "line-width": 2
+        }
+    });
+
+    function showPopup(event){ //기본map load됬을때
+            //alert("-자른거"+event.properties['SIG_ENG_NM'].split('-')[0]);
+            //alert("이벤트의 weather코드"+event.properties['cityid']);
+        if(weatherJSON.length !=0){
+             weatherJSON.features.forEach(function(element){
+                //alert("일치판단"+event.properties['cityid']+"/"+element.properties.id);
+
+                    var ftemp = (parseFloat(element.properties.temperature)-273.15).toFixed(1);
+                    var ftemp_max = (parseFloat(element.properties.max)-273.15).toFixed(1);
+                    var ftemp_min =(parseFloat(element.properties.min)-273.15).toFixed(1);
+
+                if(event.properties['cityid'] == element.properties.id){
+
+                    var content = "<h3>"+(event.properties['SIG_KOR_NM']).substr(0,3)+" "+ftemp +"°C</h3>" //온도단위바꾸기
+                        +"<p>최고기온 "+ftemp_max+"°C<br/>"
+                        +"최저기온 " +ftemp_min+"°C<br/>"
+                        +"습도 "+element.properties.humidity+"%<br/>"
+                        +"바람 "+element.properties.windSpeed+"m/s <br/>"
+                        +"구름 "+element.properties.clouds+"%</p>";
+                    popup.setLngLat(event.geometry.coordinates[0][10]);
+                    popup.setHTML(content);
+                    popup.addTo(map);
+                }
+            });
+
+        }
+
+        if(airJSON.length !=0){ //airJSON이 있을때(air 체크됫을때)
+                //console.log("이벤트"+(event.properties['SIG_KOR_NM']).substr(0,3)+"10번째좌표"+event.geometry.coordinates[0][0][0]);//화성시는 0000으로
+               //alert("이벤트조건나눌라고"+event.geometry.coordinates[0][0].length);
+         airJSON.features.forEach(function(element){ //josn에서 하나씩 다 돌려서 같은거 있으면 데이터 뽑아서 popup
+              //alert("일치하는지판단"+element.properties.city+"랑"+event.properties['SIG_KOR_NM']);
+               // alert("새로운값들"+element.properties.o3+"/"+element.properties.no2+"/"+element.properties.so2+"/"+element.properties.co);
+
+              if(element.properties.city == (event.properties['SIG_KOR_NM']).substr(0,3)){
+                 var aq = getAq(element.properties.pm10);
+                var content = "<h3>"+element.properties.city+" "+aq+"</h3>"
+                    +"<p>pm10:"+element.properties.pm10 + "㎍/㎥<br/>"
+                    +"pm25:"+element.properties.pm25 + "㎍/㎥<br/>"
+                    +"o3:"+element.properties.o3 + "ppm<br/>"
+                    +"no2:"+element.properties.no2 + "ppm<br/>"
+                    +"co:"+element.properties.co +"ppm<br/>"
+                    +"so2:"+element.properties.so2 +"ppm<br/></p>"
+                    +element.properties.dataTime+"기준";
+
+                 if(event.geometry.coordinates[0][0].length != 2){
+                    var coor = event.geometry.coordinates[0][0][0];
+
+                 }else{
+                    var coor = event.geometry.coordinates[0][0];
+                 }
+
+                popup.setLngLat(coor);
+                popup.setHTML(content); //여기깜빡거리는거: 팝업여러번 호출되서 ->고치기(remove삭제)
+
+              }
+                popup.addTo(map);
+         });
+
+        }
+
+        if(popJSON.length !=0){ //airJSON이 있을때(air 체크됫을때)
+
+         popSON.features.forEach(function(element){ //josn에서 하나씩 다 돌려서 같은거 있으면 데이터 뽑아서 popup
+              //alert("일치하는지판단"+element.properties.city+"랑"+event.properties['SIG_KOR_NM']);
+               // alert("새로운값들"+element.properties.o3+"/"+element.properties.no2+"/"+element.properties.so2+"/"+element.properties.co);
+
+              if(element.properties.city == (event.properties['SIG_KOR_NM']).substr(0,3)){
+                var content = "<h3>"+element.properties.city+"</h3>"
+                    +"<p>남:"+element.properties.Man + "명 <br/>"
+                    +"여:"+element.properties.Woman + "명<br/>"
+                    +"총 인구수 : "+element.properties.popNum + "명</p>";
+
+                popup.setLngLat(event.geometry.coordinates[0][10]);
+                popup.setHTML(content);
+                 popup.addTo(map);      //여기깜빡거리는거: 팝업여러번 호출되서 ->고치기
+              }
+         });
+
+        }
+
+
+
+
+    }
+
+
+
+    // When the user moves their mouse over the state-fill layer, we'll update the
+    // feature state for the feature under the mouse.
+    map.on("mousemove", "state-fills", function(e) {
+        if (e.features.length > 0) {
+            if (hoveredStateId) {
+                map.setFeatureState({source: 'states', id: hoveredStateId}, { hover: false});
+            }
+            //alert(e.features[0].cityid);
+            //alert(e.features[0].properties['SIG_CD']);
+
+            //hoveredStateId = e.features[0].properties['SIG_CD']
+            hoveredStateId = e.features[0].id;
+            map.setFeatureState({source: 'states', id: hoveredStateId}, { hover: true});
+            //alert("이벤트위치"+e.features[0].properties['SIG_KOR_NM']);
+            //alert("hover이벤트의 cityid"+e.features[0].properties['cityid']);
+            showPopup(e.features[0]);
+        }
+    });
+
+    // When the mouse leaves the state-fill layer, update the feature state of the
+    // previously hovered feature.
+    map.on("mouseleave", "state-fills", function(e) {
+        if (hoveredStateId) {
+            map.setFeatureState({source: 'states', id: hoveredStateId}, { hover: false});
+        }
+        hoveredStateId =  null;
+        //popup.remove();
+    });
+});
+
+//check box event
+$("#weatherCheck").click(function(){
+  if($(this).is(':checked')){
+   weatherView();
+  } else {
+    $('.weather_marker').remove();
+    weatherJSON = [];
+  }
+});
+
+$("#airCheck").click(function(){
+  if($(this).is(':checked')){
+   airView();
+   airLayer();
+  } else {
+     $('.air_marker').remove();
+     airJSON = []; //airJSON있어야만 팝업창생김, 그래서 aIrJSON을 비워서 팝업창지움
+  }
+});
+
+$("#popCheck").click(function(){
+  if($(this).is(':checked')){
+   //alert("pop check");
+   popView();
+  } else {
+   $('.pop_marker').remove();
+   popJSON = [];
+  }
+});
+
+
+function airView(){
+    $.ajax({
+        url:"/airurl",
+        type:"GET",
+        dataType: "json",
+        success : function(result){
+            //alert(result.length);
+             var airArr = new Array();
+            for(var i=0; i<result.length;i++){
+                //alert("리턴값"+jsonToGeoJson2(result[i]));
+                //alert(jsonToGeoJson2(result[i]).type);
+               airArr.push(jsonToGeoJson2(result[i]));
+                //alert(result[i].cityName+"/"+result[i].pm25Value+"/datatime"+result[i].dataTime);
+            }
+           // alert("arr다만듬");
+            airJSON = {type:"FeatureCollection",features:airArr};
+           // alert("airJSON 다 만듬");
+            //alert("갑자기위도경도"+kyonggi[0]);
+
+            airJSON.features.forEach(function(element){
+                  var cityseq = element.properties.seq;
+                  var coorindex = Number(cityseq)-1;
+
+                var el = document.createElement('div');
+                el.className = 'air_marker';
+                el.style.backgroundColor = getColor(element.properties.pm10);
+
+                var marker = new mapboxgl.Marker(el)
+                .setLngLat(kyonggi[coorindex])
+                .addTo(map);
+                //alert("마커제발찍혀라");
+            });
+
+        },
+        error : function(xhr,status,error){
+            alert(error);
+        }
+    });
+}
+
+
+function jsonToGeoJson2(airItem){
+   var features = {
+   type:"Feature",
+   properties: {
+   city: airItem.cityName,
+   cityEng : airItem.cityNameEng,
+   dataTime : airItem.dataTime,
+   pm10 : airItem.pm10Value,
+   pm25 : airItem.pm25Value,
+   no2 : airItem.no2Value,
+   o3 : airItem.o3Value,
+   so2 : airItem.so2Value,
+   co : airItem.coValue,
+   seq: airItem.districtNumSeq
+   }
+
+   };
+return features;
+}
+
+function getColor(d){ //미세먼지농도에 따라서
+    var color;
+    if(d<=30)
+        color = '#0000FF';
+    else if(d<=80)
+        color = '#00FF00';
+    else if(d<=150)
+        color = '#FFF00';
+    else
+        color = '#FF0000';
+
+    return color;
+
+}
+
+
+function popView(){
+    $.ajax({
+        url:"/popurl",
+        type:"GET",
+        dataType: "json",
+        success : function(result){
+             var popArr = new Array();
+
+            for(var i=0; i<result.length;i++){
+                //alert("리턴값"+jsonToGeoJson3(result[i]));
+                //alert(jsonToGeoJson3(result[i]).type);
+                //alert(result[i].cityName+"/"+result[i].popNum+"/"+result[i].Man+"/"+result[i].Woman);
+               popArr.push(jsonToGeoJson3(result[i]));
+            }
+           // alert("arr다만듬");
+            popJSON = {type:"FeatureCollection",features:popArr};
+           // alert("popJSON 다 만듬");
+
+            popJSON.features.forEach(function(element){
+                  var cityseq = element.properties.seq;
+                  var coorindex = Number(cityseq)-1;
+
+                var el = document.createElement('div');
+                 el.className = 'pop_marker';
+                //el.style.backgroundColor = getSize(element.properties.popNum);
+                el.style.width = getSize(element.properties.popNum)+'px';
+                el.style.height = getSize(element.properties.popNum)+'px';
+
+                 el.addEventListener('mousemove',function(){
+                     popup.setLngLat(kyonggi[coorindex])
+                     //popup.setHTML(element.properties.city+element.properties.cityEng+'<br/>'+kyonggi[coorindex])
+                     popup.setHTML("<h3>"+element.properties.cityName+" 인구수: "+element.properties.popNum+"명</br>"
+                        +"(남:"+element.properties.Man+"명 여:"+element.properties.Woman+"명)</h3>")
+                    popup.addTo(map);
+                });
+                el.addEventListener('mouseleave',function(e){
+                    popup.remove();
+                });
+
+                var marker = new mapboxgl.Marker(el)
+                .setLngLat(kyonggi[coorindex])
+                .addTo(map);
+                //alert("마커찍혀라");
+
+            });
+
+        },
+        error : function(xhr,status,error){
+            alert(error);
+        }
+    });
+}
+
+function jsonToGeoJson3(popItem){
+   var features = {
+   type:"Feature",
+   properties: {
+   cityName: popItem.cityName,
+   popNum : popItem.popNum,
+   Man : popItem.Man,
+   Woman : popItem.Woman,
+   seq: popItem.seq
+   }
+
+   };
+return features;
+}
+
+function getSize(d){ //미세먼지농도에 따라서
+    var size;
+    if(d>=1000000)
+         size =70;
+    else if(d>=800000)
+        size =60;
+    else if(d>=600000)
+        size = 50;
+    else if(d>=400000)
+        size = 40;
+    else if(d>=200000)
+        size = 30;
+     else if(d>=100000)
+        size = 20;
+     else
+        size = 10;
+
+    return size;
+
+}
+
+function getAq(d){ //미세먼지농도에 따라서 색깔차지
+    var aq;
+    if(d<=30)
+        aq = "좋음";
+    else if(d<=80)
+        aq = "보통";
+    else if(d<=150)
+        aq = "나쁨";
+    else
+        aq = "매우나쁨";
+    return aq;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+//weather view를 url에서 가져오는거
+function weatherView(){
+    $.ajax({
+        url : "/weatherurl",
+        type : "GET",
+        dataType : "json",
+        success : function(result){
+            var weatherArr = new Array();
+            console.log(result.length);
+            for(var i =0;i < result.length;i++){
+                weatherArr.push(jsonToGeoJson(result[i]));
+            }
+            weatherJSON = {type:"FeatureCollection",features:weatherArr};
+           // alert("weatherJSON다 만듬"+weatherArr.length);
+
+            for(var i =0;i < result.length;i++){
+                //alert("어레이에있는거 id하나씩"+weatherArr[i].properties.id);
+                var icon = weatherArr[i].properties.icon;
+
+                 var el = document.createElement('div');
+                el.className = 'weather_marker';
+               el.style.backgroundImage = 'url('+icon+')'
+
+              //alert("날씨마커찍을 위도경도(맨마지막꺼)"+kyonggi[result.length-1]);
+              // 날씨 아이콘에 팝업창 안함
+
+                new mapboxgl.Marker(el)
+                    .setLngLat(kyonggi[i])
+                    .addTo(map);
+            }
+
+        },
+        error : function(xhr,status,error){
+            alert(error);
+        }
+    });
+}
+
+//mapbox에 올릴 Geojson형식으로 바꾸기
+function jsonToGeoJson(weatherItem){
+    var feature = {
+      type: "Feature",
+      properties: {
+        id : weatherItem.id,
+        city: weatherItem.name,
+        weather: weatherItem.weather[0].main,
+        temperature: weatherItem.main.temp,
+        min: weatherItem.main.temp_min,
+        max: weatherItem.main.temp_max,
+        humidity: weatherItem.main.humidity,
+        pressure: weatherItem.main.pressure,
+        windSpeed: weatherItem.wind.speed,
+        windDegrees: weatherItem.wind.deg,
+        windGust: weatherItem.wind.gust,
+        clouds: weatherItem.clouds.all,
+        icon: "http://openweathermap.org/img/w/"
+              + weatherItem.weather[0].icon  + ".png",
+        coordinates: [weatherItem.coord.Lon, weatherItem.coord.Lat]
+      },
+      geometry: {
+        type: "Point",
+        coordinates: [weatherItem.coord.Lon, weatherItem.coord.Lat]
+      }
+    };
+
+return feature;
+}
+
+
+
+
+
+
+</script>
+
+
+</body>
+</html>
